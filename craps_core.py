@@ -1,4 +1,5 @@
 from numpy.random import randint as rnd
+import qLearningFunctions as ql
 
 #Function to execute next roll and return any rewards earned
 def rollTheDice(wager,odds,point = 0):
@@ -316,6 +317,92 @@ def findBestBruteForce(wager,odds,passDontPassBet = 5,pointBet = 10,numRounds = 
 
 	return(netWinnings)
 
+#Determine best action step by step via simulation
+def findBestBruteForceSingleWager(wager,odds,qFrame,passDontPassBet = 5,pointBet = 10,numRounds = 100):
+
+	#Initialize accumulating variables
+	netWinnings = 0
+	numRolls = 0
+
+	tempWinnings = 0
+	tempKey = ''
+
+	#Try 'Pass' and 'Don't Pass' Bets
+	for key in ['pass','dontPass']:
+
+		#Place bet
+		wager[key] = passDontPassBet
+
+		#Simulate 1000 rounds and get avg winnings
+		avgWinnings = 0
+		for i in range(numRounds):
+			winnings,point,numRolls = finishRound(wager.copy(),odds)[1:4]
+			avgWinnings += winnings/numRounds
+
+		#Save best of the 2 bets
+		if avgWinnings > tempWinnings:
+			tempWinnings = avgWinnings
+			tempKey = key
+
+		#Remove the bet
+		wager[key] = 0
+
+	#Place the better bet
+	wager[tempKey] = passDontPassBet
+	netWinnings -= passDontPassBet
+
+	#Simulate the roll for real
+	roll,addedWinnings,roundOver = rollTheDice(wager.copy(),odds)
+	point = roll
+	netWinnings += addedWinnings
+	#print(point,roundOver)
+	#print(tempKey)
+
+
+	if not roundOver:
+		#Set a baseline of placing no additional bet
+		for i in range(numRounds):
+			addedWinnings = finishRound(wager.copy(),odds,point)[1]
+			tempWinnings += addedWinnings/numRounds
+		tempKey = ''
+
+		#Try each bet that isn't 'Pass' or 'Don't Pass'
+		for key in [x for x in wager.keys() if x not in ['pass','dontPass']]:
+
+			#Place bet
+			wager[key] = pointBet
+
+			#Simulate 1000 rounds and get avg winnings
+			avgWinnings = 0
+			for i in range(numRounds):
+				addedWinnings = finishRound(wager.copy(),odds,point)[1]
+				avgWinnings += addedWinnings/numRounds
+
+			#Save best bet
+			if avgWinnings > tempWinnings:
+				tempWinnings = avgWinnings
+				tempKey = key
+
+			#Remove the bet
+			wager[key] = 0
+
+		#Place the best bet
+		if tempKey != '':
+			wager[tempKey] = pointBet
+			netWinnings -= pointBet
+			#print(tempKey)
+
+		#Simulate the rest of the round for real
+		addedWinnings = finishRound(wager.copy(),odds,point)[1]
+		netWinnings += addedWinnings
+
+	qFrame = ql.updateQFrame(qFrame,point,wager,netWinnings)
+
+	#print('Result:',point,netWinnings,numRolls)
+	#print('----------------')
+
+	return(netWinnings,qFrame)
+
 
 #Handle execution of secondary functions
 def main():
@@ -414,21 +501,24 @@ def main():
 			'world':{2:(26.0/5),3:(11.0/5),7:0,11:(11.0/5),12:(26.0/5)},
 			'field':{2:2,3:1,4:1,9:1,10:1,11:1,12:2}}
 
-	for passDontPassBet in range(5,20,5):
+	#Initialize q Learning data frame
+	qFrame = ql.initializeQFrame()
 
-		for pointBet in range(5,25,5):
+	for passDontPassBet in range(5,30,5):
+
+		for pointBet in range(5,30,5):
 
 			print('Pass Bet: ',passDontPassBet,' -- Point Bet: ',pointBet)
 
 			avgGrossWinnings = 0
 
-			for i in range(100):
+			for i in range(1000):
 				
 				grossWinnings = 100
 
 				for i in range(100):
 
-					addedWinnings = findBestBruteForce(wager.copy(),odds)
+					addedWinnings,qFrame = findBestBruteForceSingleWager(wager,odds,qFrame,passDontPassBet,pointBet)
 
 					if grossWinnings < 75 and addedWinnings < 0:
 						break
@@ -439,11 +529,14 @@ def main():
 					grossWinnings += addedWinnings
 
 				#print(grossWinnings)
+				#print('******************')
 
-				avgGrossWinnings += grossWinnings/100
+				avgGrossWinnings += grossWinnings/1000
 
 			print(avgGrossWinnings)
 			print('--------------------')
+
+	ql.writeQFrame('qLearningData2.csv',qFrame)
 	
 
 if __name__ == '__main__':
