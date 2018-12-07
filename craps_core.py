@@ -396,7 +396,7 @@ def findBestBruteForceSingleWager(wager,odds,qFrame,passDontPassBet = 5,pointBet
 		addedWinnings = finishRound(wager.copy(),odds,point)[1]
 		netWinnings += addedWinnings
 
-	qFrame = ql.updateQFrame(qFrame,point,wager,netWinnings)
+	qFrame = ql.updateQFrame(qFrame,point,wager.copy(),netWinnings)
 
 	#print('Result:',point,netWinnings,numRolls)
 	#print('----------------')
@@ -518,15 +518,15 @@ def main():
 
 				for i in range(100):
 
-					addedWinnings,qFrame = findBestBruteForceSingleWager(wager,odds,qFrame,passDontPassBet,pointBet)
+					addedWinnings,qFrame = findBestBruteForceSingleWager(wager.copy(),odds,qFrame,passDontPassBet,pointBet,numRounds = 25)
+
+					grossWinnings += addedWinnings
 
 					if grossWinnings < 75 and addedWinnings < 0:
 						break
 
 					if grossWinnings > 150 and addedWinnings < 0:
 						break
-
-					grossWinnings += addedWinnings
 
 				#print(grossWinnings)
 				#print('******************')
@@ -536,7 +536,8 @@ def main():
 			print(avgGrossWinnings)
 			print('--------------------')
 
-	ql.writeQFrame('qLearningData2.csv',qFrame)
+	#print(qFrame)
+	ql.writeQFrame('qLearningData4_lowLookAhead.csv',qFrame)
 	
 
 if __name__ == '__main__':
